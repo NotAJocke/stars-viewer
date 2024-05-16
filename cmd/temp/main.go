@@ -1,11 +1,14 @@
 package main
 
 import (
-	"encoding/json"
+	"database/sql"
+	"fmt"
 	"log"
 
-	"github.com/NotAJocke/stars-viewer/internal/github"
+	"github.com/NotAJocke/stars-viewer/internal/database"
+	// "github.com/NotAJocke/stars-viewer/internal/github"
 	"github.com/joho/godotenv"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
@@ -14,13 +17,15 @@ func main() {
 		log.Fatal("Couldn't read env file")
 	}
 
-	repos := github.GetStarredRepos()
-
-	var result []map[string]interface{}
-	err = json.Unmarshal([]byte(repos), &result)
+	db, err := sql.Open("sqlite3", "./db/database.db")
 	if err != nil {
-		log.Fatalln("Error parsing JSON:", err)
+		log.Fatalln(err)
 	}
+	defer db.Close()
 
-	log.Println(len(result))
+	// repos := github.GetStarredRepos()
+	// database.AppendRepos(db, repos)
+
+	repos := database.FetchRepos(db)
+	fmt.Println(len(repos))
 }
