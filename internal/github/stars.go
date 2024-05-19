@@ -10,15 +10,24 @@ import (
 	"time"
 )
 
-type RepoData struct {
-	Name     string `json:"name"`
-	FullName string `json:"full_name"`
-	Url      string `json:"html_url"`
+type repoData struct {
+	Name        string `json:"name"`
+	FullName    string `json:"full_name"`
+	Url         string `json:"html_url"`
+	Description string `json:"description"`
+}
+
+type starredRepoResponse struct {
+	Repo      repoData  `json:"repo"`
+	StarredAt time.Time `json:"starred_at"`
 }
 
 type StarredRepo struct {
-	Repo      RepoData  `json:"repo"`
-	StarredAt time.Time `json:"starred_at"`
+	Name        string
+	FullName    string
+	Description string
+	Url         string
+	StarredAt   time.Time
 }
 
 func GetStarredRepos() []StarredRepo {
@@ -44,22 +53,22 @@ func GetStarredRepos() []StarredRepo {
 		log.Fatalln("Error reading response body:", err)
 	}
 
-	var repos []StarredRepo
-	err = json.Unmarshal(body, &repos)
+	var reposRes []starredRepoResponse
+	err = json.Unmarshal(body, &reposRes)
 	if err != nil {
 		log.Fatalln("Error parsing JSON:", err)
 	}
 
-	// for _, repo := range repos {
-	// 	log.Printf("Name: %s\n", repo.Repo.Name)
-	// 	log.Printf("Full name: %s\n", repo.Repo.FullName)
-	// 	log.Printf("URL: %s\n", repo.Repo.Url)
-	// 	tz := time.Now().Local().Location()
-	// 	log.Printf("Starred at: %s\n", repo.StarredAt.In(tz))
-	// }
+	var repos []StarredRepo
+	for _, repo := range reposRes {
+		repos = append(repos, StarredRepo{
+			Name:        repo.Repo.Name,
+			Description: repo.Repo.Description,
+			FullName:    repo.Repo.FullName,
+			Url:         repo.Repo.Url,
+			StarredAt:   repo.StarredAt,
+		})
+	}
 
 	return repos
-}
-
-func GetStarredReposName() {
 }

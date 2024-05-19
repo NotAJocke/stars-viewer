@@ -1,6 +1,7 @@
 CREATE TABLE stars(
   id INTEGER PRIMARY KEY,
   name TEXT UNIQUE,
+  description TEXT UNIQUE,
   full_name TEXT UNIQUE,
   url TEXT UNIQUE,
   starred_at TEXT
@@ -8,7 +9,8 @@ CREATE TABLE stars(
 
 CREATE TABLE labels (
   id INTEGER PRIMARY KEY,
-  name TEXT UNIQUE
+  name TEXT UNIQUE,
+  color TEXT
 );
 
 CREATE TABLE stars_labels(
