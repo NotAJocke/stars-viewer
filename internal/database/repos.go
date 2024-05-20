@@ -11,6 +11,7 @@ import (
 )
 
 type StarredRepo struct {
+	Id          int
 	Name        string
 	FullName    string
 	Url         string
@@ -59,7 +60,7 @@ func AppendRepos(db *sql.DB, repos []github.StarredRepo) {
 
 func FetchRepos(db *sql.DB) []StarredRepo {
 
-	q := `SELECT s.name, s.full_name, s.url, s.starred_at, s.description, IFNULL(GROUP_CONCAT(l.name, ', '), '') AS labels FROM stars s
+	q := `SELECT s.id, s.name, s.full_name, s.url, s.starred_at, s.description, IFNULL(GROUP_CONCAT(l.name, ', '), '') AS labels FROM stars s
   LEFT JOIN stars_labels sl ON s.id = sl.star_id
   LEFT JOIN labels l ON sl.label_id = l.id
   GROUP BY s.id, s.full_name;
@@ -78,7 +79,7 @@ func FetchRepos(db *sql.DB) []StarredRepo {
 		var starred_at string
 		var labels string
 
-		if err := rows.Scan(&repo.Name, &repo.FullName, &repo.Url, &starred_at, &repo.Description, &labels); err != nil {
+		if err := rows.Scan(&repo.Id, &repo.Name, &repo.FullName, &repo.Url, &starred_at, &repo.Description, &labels); err != nil {
 			log.Fatal(err)
 		}
 

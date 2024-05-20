@@ -32,6 +32,7 @@ func main() {
 
 	fmt.Println("Number of repos:", len(repos))
 	for _, r := range repos {
+		fmt.Printf("Id: %d\n", r.Id)
 		fmt.Printf("Name: %s\n", r.Name)
 		fmt.Printf("Full Name: %s\n", r.FullName)
 		fmt.Printf("Url: %s\n", r.Url)
@@ -39,4 +40,5 @@ func main() {
 		fmt.Printf("Starred at: %s\n", r.StarredAt.In(tz).Format("2006/01/02 - 15:04"))
 		fmt.Printf("Labels: %v\n\n", r.Labels)
 	}
+
 }
