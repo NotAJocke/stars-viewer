@@ -103,3 +103,46 @@ func FetchRepos(db *sql.DB) []StarredRepo {
 
 	return repos
 }
+
+func DeleteRepoById(db *sql.DB, id int) {
+	tx, err := db.Begin()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	q1 := `DELETE FROM stars_labels WHERE star_id=?;`
+	q2 := `DELETE FROM stars WHERE id=?;`
+
+	stmt, err := tx.Prepare(q1)
+	if err != nil {
+		tx.Rollback()
+		log.Fatal(err)
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(id)
+	if err != nil {
+		tx.Rollback()
+		log.Fatal(err)
+	}
+
+	stmt, err = tx.Prepare(q2)
+	if err != nil {
+		tx.Rollback()
+		log.Fatal(err)
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(id)
+	if err != nil {
+		tx.Rollback()
+		log.Fatal(err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		tx.Rollback()
+		log.Fatalln(err)
+	}
+
+}
