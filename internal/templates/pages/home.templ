@@ -1,0 +1,23 @@
+package pages
+
+import "github.com/NotAJocke/stars-viewer/internal/templates/shared"
+import "github.com/NotAJocke/stars-viewer/internal/github"
+import "time"
+
+templ starredRepo(repo github.StarredRepo) {
+	<ul>
+		<li>
+			<a href={ templ.URL(repo.Url) } target="_blank">{ repo.Name } ({ repo.FullName })</a>
+			<p>{ repo.Description }</p>
+			<p>{ repo.StarredAt.In(time.Now().Local().Location()).Format("2006/01/02 - 15:04") }</p>
+		</li>
+	</ul>
+}
+
+templ HomePage(repos []github.StarredRepo) {
+	@shared.Page("Home") {
+		for _, repo := range repos {
+			@starredRepo(repo)
+		}
+	}
+}

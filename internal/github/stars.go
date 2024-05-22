@@ -11,10 +11,12 @@ import (
 )
 
 type repoData struct {
-	Name        string `json:"name"`
-	FullName    string `json:"full_name"`
-	Url         string `json:"html_url"`
-	Description string `json:"description"`
+	Name        string   `json:"name"`
+	FullName    string   `json:"full_name"`
+	Url         string   `json:"html_url"`
+	Description string   `json:"description"`
+	Language    string   `json:"language"`
+	Topics      []string `json:"topics"`
 }
 
 type starredRepoResponse struct {
@@ -28,10 +30,12 @@ type StarredRepo struct {
 	Description string
 	Url         string
 	StarredAt   time.Time
+	Language    string
+	Topics      []string
 }
 
 func GetStarredRepos() []StarredRepo {
-	req, err := http.NewRequest("GET", "https://api.github.com/user/starred?per_page=2", nil)
+	req, err := http.NewRequest("GET", "https://api.github.com/user/starred?per_page=1", nil)
 	if err != nil {
 		log.Fatalln("Couldn't create request to github.")
 	}
@@ -67,6 +71,8 @@ func GetStarredRepos() []StarredRepo {
 			FullName:    repo.Repo.FullName,
 			Url:         repo.Repo.Url,
 			StarredAt:   repo.StarredAt,
+			Topics:      repo.Repo.Topics,
+			Language:    repo.Repo.Language,
 		})
 	}
 

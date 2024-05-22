@@ -1,18 +1,28 @@
 package routes
 
 import (
-	"fmt"
+	"database/sql"
 	"net/http"
+
+	"github.com/NotAJocke/stars-viewer/internal/database"
+	"github.com/NotAJocke/stars-viewer/internal/templates/pages"
 )
 
-func NewRouter() http.Handler {
+type App struct {
+	Db *sql.DB
+}
+
+func (app *App) NewRouter() http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", MainRoute)
+	mux.HandleFunc("/", app.MainRoute)
 
 	return mux
 }
 
-func MainRoute(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Hello World")
+func (app *App) MainRoute(w http.ResponseWriter, r *http.Request) {
+	repos := database.GetRepos(app.Db, 0)
+
+	component := pages.HomePage(repos)
+	component.Render(r.Context(), w)
 }

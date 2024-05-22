@@ -2,69 +2,16 @@ package database
 
 import (
 	"database/sql"
+	"encoding/json"
 	"log"
-	"strings"
 	"time"
 
 	"github.com/NotAJocke/stars-viewer/internal/github"
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type StarredRepo struct {
-	Id          int
-	Name        string
-	FullName    string
-	Url         string
-	StarredAt   time.Time
-	Description string
-	Labels      []string
-}
-
-func AppendRepos(db *sql.DB, repos []github.StarredRepo) {
-	tx, err := db.Begin()
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	q := `
-  INSERT INTO stars (name, full_name, url, starred_at, description) VALUES 
-  `
-	var params []interface{}
-	for i, repo := range repos {
-		if i > 0 {
-			q += ","
-		}
-		q += "(?, ?, ?, ?, ?)"
-		params = append(params, repo.Name, repo.FullName, repo.Url, repo.StarredAt.Format(time.RFC3339), repo.Description)
-	}
-
-	stmt, err := tx.Prepare(q)
-	if err != nil {
-		tx.Rollback()
-		log.Fatal(err)
-	}
-	defer stmt.Close()
-
-	_, err = stmt.Exec(params...)
-	if err != nil {
-		tx.Rollback()
-		log.Fatal(err)
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		tx.Rollback()
-		log.Fatalln(err)
-	}
-}
-
-func FetchRepos(db *sql.DB) []StarredRepo {
-
-	q := `SELECT s.id, s.name, s.full_name, s.url, s.starred_at, s.description, IFNULL(GROUP_CONCAT(l.name, ', '), '') AS labels FROM stars s
-  LEFT JOIN stars_labels sl ON s.id = sl.star_id
-  LEFT JOIN labels l ON sl.label_id = l.id
-  GROUP BY s.id, s.full_name;
-  `
+func GetLastStarredTime(db *sql.DB) time.Time {
+	q := `SELECT starred_at FROM stars ORDER BY starred_at DESC LIMIT 1;`
 
 	rows, err := db.Query(q)
 	if err != nil {
@@ -72,15 +19,67 @@ func FetchRepos(db *sql.DB) []StarredRepo {
 	}
 	defer rows.Close()
 
-	var repos []StarredRepo
+	var starred_at string
+	if rows.Next() {
+		err := rows.Scan(&starred_at)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	} else {
+		log.Fatalln("No rows returned")
+	}
+
+	parsed, err := time.Parse(time.RFC3339, starred_at)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	return parsed
+}
+
+func GetRepos(db *sql.DB, limit int) []github.StarredRepo {
+	var q string
+
+	if limit != 0 {
+		q = `SELECT 
+    name, description, full_name, url, starred_at, topics, language 
+    FROM stars ORDER BY starred_at DESC LIMIT ?;`
+	} else {
+		q = `SELECT 
+    name, description, full_name, url, starred_at, topics, language 
+    FROM stars ORDER BY starred_at DESC;`
+	}
+
+	var rows *sql.Rows
+	var err error
+	if limit != 0 {
+		rows, err = db.Query(q, limit)
+	} else {
+		rows, err = db.Query(q)
+	}
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer rows.Close()
+
+	var repos []github.StarredRepo
 
 	for rows.Next() {
-		var repo StarredRepo
+		var repo github.StarredRepo
 		var starred_at string
-		var labels string
+		var topics string
 
-		if err := rows.Scan(&repo.Id, &repo.Name, &repo.FullName, &repo.Url, &starred_at, &repo.Description, &labels); err != nil {
-			log.Fatal(err)
+		if err := rows.Scan(
+			&repo.Name,
+			&repo.Description,
+			&repo.FullName,
+			&repo.Url,
+			&starred_at,
+			&topics,
+			&repo.Language,
+		); err != nil {
+			log.Fatalln(err)
 		}
 
 		repo.StarredAt, err = time.Parse(time.RFC3339, starred_at)
@@ -88,10 +87,9 @@ func FetchRepos(db *sql.DB) []StarredRepo {
 			log.Fatalln(err)
 		}
 
-		if labels == "" {
-			repo.Labels = []string{}
-		} else {
-			repo.Labels = strings.Split(labels, ", ")
+		err = json.Unmarshal([]byte(topics), &repo.Topics)
+		if err != nil {
+			log.Fatalln(err)
 		}
 
 		repos = append(repos, repo)
@@ -104,36 +102,57 @@ func FetchRepos(db *sql.DB) []StarredRepo {
 	return repos
 }
 
-func DeleteRepoById(db *sql.DB, id int) {
+func AddRepos(db *sql.DB, repos []github.StarredRepo) {
 	tx, err := db.Begin()
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	q1 := `DELETE FROM stars_labels WHERE star_id=?;`
-	q2 := `DELETE FROM stars WHERE id=?;`
+	q := `INSERT INTO stars (name, description, full_name, url, starred_at, topics, language) VALUES (?, ?, ?, ?, ?, ?, ?);`
 
-	stmt, err := tx.Prepare(q1)
+	stmt, err := tx.Prepare(q)
 	if err != nil {
 		tx.Rollback()
 		log.Fatal(err)
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(id)
-	if err != nil {
-		tx.Rollback()
-		log.Fatal(err)
+	for _, repo := range repos {
+		topics, err := json.Marshal(repo.Topics)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		_, err = stmt.Exec(repo.Name, repo.Description, repo.FullName, repo.Url, repo.StarredAt.Format(time.RFC3339), topics, repo.Language)
+		if err != nil {
+			tx.Rollback()
+			log.Fatal(err)
+		}
 	}
 
-	stmt, err = tx.Prepare(q2)
+	err = tx.Commit()
+	if err != nil {
+		tx.Rollback()
+		log.Fatalln(err)
+	}
+}
+
+func DeleteRepo(db *sql.DB, repoFullName string) {
+	tx, err := db.Begin()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	q := `DELETE FROM stars WHERE full_name=?`
+
+	stmt, err := tx.Prepare(q)
 	if err != nil {
 		tx.Rollback()
 		log.Fatal(err)
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(id)
+	_, err = stmt.Exec(repoFullName)
 	if err != nil {
 		tx.Rollback()
 		log.Fatal(err)
@@ -144,5 +163,140 @@ func DeleteRepoById(db *sql.DB, id int) {
 		tx.Rollback()
 		log.Fatalln(err)
 	}
-
 }
+
+//	type StarredRepo struct {
+//		Id          int
+//		Name        string
+//		FullName    string
+//		Url         string
+//		StarredAt   time.Time
+//		Description string
+//		Labels      []string
+//	}
+// func AppendRepos(db *sql.DB, repos []github.StarredRepo) {
+// 	tx, err := db.Begin()
+// 	if err != nil {
+// 		log.Fatalln(err)
+// 	}
+//
+// 	q := `
+//   INSERT INTO stars (name, full_name, url, starred_at, description) VALUES
+//   `
+// 	var params []interface{}
+// 	for i, repo := range repos {
+// 		if i > 0 {
+// 			q += ","
+// 		}
+// 		q += "(?, ?, ?, ?, ?)"
+// 		params = append(params, repo.Name, repo.FullName, repo.Url, repo.StarredAt.Format(time.RFC3339), repo.Description)
+// 	}
+//
+// 	stmt, err := tx.Prepare(q)
+// 	if err != nil {
+// 		tx.Rollback()
+// 		log.Fatal(err)
+// 	}
+// 	defer stmt.Close()
+//
+// 	_, err = stmt.Exec(params...)
+// 	if err != nil {
+// 		tx.Rollback()
+// 		log.Fatal(err)
+// 	}
+//
+// 	err = tx.Commit()
+// 	if err != nil {
+// 		tx.Rollback()
+// 		log.Fatalln(err)
+// 	}
+// }
+//
+// func GetRepos(db *sql.DB) []StarredRepo {
+//
+// 	q := `SELECT s.id, s.name, s.full_name, s.url, s.starred_at, s.description, IFNULL(GROUP_CONCAT(l.name, ', '), '') AS labels FROM stars s
+//   LEFT JOIN stars_labels sl ON s.id = sl.star_id
+//   LEFT JOIN labels l ON sl.label_id = l.id
+//   GROUP BY s.id, s.full_name;
+//   `
+//
+// 	rows, err := db.Query(q)
+// 	if err != nil {
+// 		log.Fatalln(err)
+// 	}
+// 	defer rows.Close()
+//
+// 	var repos []StarredRepo
+//
+// 	for rows.Next() {
+// 		var repo StarredRepo
+// 		var starred_at string
+// 		var labels string
+//
+// 		if err := rows.Scan(&repo.Id, &repo.Name, &repo.FullName, &repo.Url, &starred_at, &repo.Description, &labels); err != nil {
+// 			log.Fatal(err)
+// 		}
+//
+// 		repo.StarredAt, err = time.Parse(time.RFC3339, starred_at)
+// 		if err != nil {
+// 			log.Fatalln(err)
+// 		}
+//
+// 		if labels == "" {
+// 			repo.Labels = []string{}
+// 		} else {
+// 			repo.Labels = strings.Split(labels, ", ")
+// 		}
+//
+// 		repos = append(repos, repo)
+// 	}
+//
+// 	if err := rows.Err(); err != nil {
+// 		log.Fatalln(err)
+// 	}
+//
+// 	return repos
+// }
+//
+// func DeleteRepoById(db *sql.DB, id int) {
+// 	tx, err := db.Begin()
+// 	if err != nil {
+// 		log.Fatalln(err)
+// 	}
+//
+// 	q1 := `DELETE FROM stars_labels WHERE star_id=?;`
+// 	q2 := `DELETE FROM stars WHERE id=?;`
+//
+// 	stmt, err := tx.Prepare(q1)
+// 	if err != nil {
+// 		tx.Rollback()
+// 		log.Fatal(err)
+// 	}
+// 	defer stmt.Close()
+//
+// 	_, err = stmt.Exec(id)
+// 	if err != nil {
+// 		tx.Rollback()
+// 		log.Fatal(err)
+// 	}
+//
+// 	stmt, err = tx.Prepare(q2)
+// 	if err != nil {
+// 		tx.Rollback()
+// 		log.Fatal(err)
+// 	}
+// 	defer stmt.Close()
+//
+// 	_, err = stmt.Exec(id)
+// 	if err != nil {
+// 		tx.Rollback()
+// 		log.Fatal(err)
+// 	}
+//
+// 	err = tx.Commit()
+// 	if err != nil {
+// 		tx.Rollback()
+// 		log.Fatalln(err)
+// 	}
+//
+// }
