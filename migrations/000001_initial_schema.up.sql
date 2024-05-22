@@ -1,7 +1,7 @@
 CREATE TABLE stars(
   id INTEGER PRIMARY KEY,
-  name TEXT UNIQUE,
-  description TEXT UNIQUE,
+  name TEXT,
+  description TEXT,
   full_name TEXT UNIQUE,
   url TEXT UNIQUE,
   starred_at TEXT,
