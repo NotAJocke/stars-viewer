@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"regexp"
@@ -36,9 +35,7 @@ type StarredRepo struct {
 	Topics      []string
 }
 
-func Paginate() []StarredRepo {
-	token := os.Getenv("GH_TOKEN")
-	auth := fmt.Sprintf("Bearer %s", token)
+func Paginate() ([]StarredRepo, error) {
 
 	const nextPattern = `(?i)<([^>]*)>; rel="next"`
 	re := regexp.MustCompile(nextPattern)
@@ -47,65 +44,101 @@ func Paginate() []StarredRepo {
 
 	pagesRemaining := true
 	var repos []StarredRepo
-	url := "https://api.github.com/user/starred?per_age=100"
-	i := 0
+	url := "https://api.github.com/user/starred?per_page=100"
 
 	for pagesRemaining {
-		req, err := http.NewRequest("GET", url, nil)
+		res, err := requestStarredRepos(client, url)
 		if err != nil {
-			log.Fatalln("Couldn't create request to github.")
-		}
-		req.Header.Set("Authorization", auth)
-		req.Header.Set("Accept", "application/vnd.github.v3.star+json")
-
-		res, err := client.Do(req)
-		if err != nil {
-			log.Fatalln("Error making request:", err)
+			return nil, err
 		}
 		defer res.Body.Close()
 
 		body, err := io.ReadAll(res.Body)
 		if err != nil {
-			log.Fatalln("Error reading response body:", err)
+			return nil, fmt.Errorf("Error reading response body: %w", err)
 		}
 
-		parsed := parseStarredRepos(body)
+		parsed, err := parseStarredRepos(body)
+		if err != nil {
+			return nil, err
+		}
 		repos = append(repos, parsed...)
 
-		// linkHeader :=
 		linkHeader := res.Header.Get("link")
-		log.Printf("link header at i=%d: %s\n", i, linkHeader)
 		if linkHeader == "" {
-			log.Printf("Link header empty leaving at i=%d\n", i)
 			pagesRemaining = false
 		}
 		if !strings.Contains(linkHeader, `rel="next"`) {
-			log.Printf("Link header not empty but no next at i=%d\n", i)
 			pagesRemaining = false
 		}
 
 		if pagesRemaining {
 			match := re.FindStringSubmatch(linkHeader)
 			if match == nil {
-				log.Fatalf("No match for a next link in '%s'\n", linkHeader)
+				return nil, fmt.Errorf("Regex failed finding next link")
 			}
 
 			url = match[1]
-			log.Printf("Link header not empty new url: %s\n", url)
 		}
-
-		i += 1
 	}
 
-	return repos
+	return repos, nil
 }
 
-func parseStarredRepos(body []byte) []StarredRepo {
+func RequestLastStarredRepos(client *http.Client, pages ...int) ([]StarredRepo, error) {
+	var page int
+	if len(pages) > 0 {
+		page = pages[0]
+	} else {
+		page = 0
+	}
+
+	url := fmt.Sprintf("https://api.github.com/user/starred?per_page=30&page=%d", page)
+
+	res, err := requestStarredRepos(client, url)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("Error reading response body: %w", err)
+	}
+
+	parsed, err := parseStarredRepos(body)
+	if err != nil {
+		return nil, err
+	}
+
+	return parsed, nil
+}
+
+func requestStarredRepos(client *http.Client, url string) (*http.Response, error) {
+	token := os.Getenv("GH_TOKEN")
+	auth := fmt.Sprintf("Bearer %s", token)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("Couln't create request to url '%s'", url)
+	}
+	req.Header.Set("Authorization", auth)
+	req.Header.Set("Accept", "application/vnd.github.v3.star+json")
+
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("Failed sending request to url '%s'", url)
+	}
+
+	return res, nil
+}
+
+func parseStarredRepos(body []byte) ([]StarredRepo, error) {
 
 	var reposRes []starredRepoResponse
 	err := json.Unmarshal(body, &reposRes)
 	if err != nil {
-		log.Fatalln("Error parsing JSON:", err)
+		return nil, fmt.Errorf("Error parsing json response")
 	}
 
 	var repos []StarredRepo
@@ -121,14 +154,14 @@ func parseStarredRepos(body []byte) []StarredRepo {
 		})
 	}
 
-	return repos
+	return repos, nil
 }
 
-func UnstarRepo(fullName string) {
+func UnstarRepo(fullName string) error {
 	url := fmt.Sprintf("https://api.github.com/user/starred/%s", fullName)
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
-		log.Fatalln("Couldn't create request to github.")
+		return fmt.Errorf("Couln't create request to url '%s'", url)
 	}
 
 	token := os.Getenv("GH_TOKEN")
@@ -139,7 +172,9 @@ func UnstarRepo(fullName string) {
 	client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
-		log.Fatalln("Error making request:", err)
+		return fmt.Errorf("Failed sending request to url '%s'", url)
 	}
 	defer res.Body.Close()
+
+	return nil
 }
