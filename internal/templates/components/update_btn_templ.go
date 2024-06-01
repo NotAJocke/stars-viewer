@@ -23,7 +23,7 @@ func UpdateBtn() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<button type=\"button\" class=\"border-[1.5px] border-gray-300 py-[6px] px-3 rounded-xl shadow-[0_0_4px_0_rgba(0,0,0,0.1)] hover:shadow-[0_0_4px_0_rgba(0,0,0,0.2)]\">Update</button>")
+		templ_7745c5c3_Err = templ.WriteWatchModeString(templ_7745c5c3_Buffer, 1)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

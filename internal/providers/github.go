@@ -45,8 +45,8 @@ func GetStarredRepos(db *sql.DB, limit int) []github.StarredRepo {
 	return database.GetRepos(db, limit)
 }
 
-func UnstarRepo(db *sql.DB, repo github.StarredRepo) {
-	github.UnstarRepo(repo.FullName)
+func UnstarRepo(db *sql.DB, fullName string) {
+	github.UnstarRepo(fullName)
 
-	database.DeleteRepo(db, repo.FullName)
+	database.DeleteRepo(db, fullName)
 }
