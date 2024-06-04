@@ -1,0 +1,19 @@
+package components
+
+templ SearchBar() {
+	<div class="relative w-1/2">
+		<svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" class="absolute top-1/2 -translate-y-1/2 left-3">
+			<path d="M10.9521 10.9642L15 15M12.6667 6.83333C12.6667 10.055 10.055 12.6667 6.83333 12.6667C3.61167 12.6667 1 10.055 1 6.83333C1 3.61167 3.61167 1 6.83333 1C10.055 1 12.6667 3.61167 12.6667 6.83333Z" stroke="#9CA3AF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+		</svg>
+		<input
+			type="search"
+			id="search"
+			name="search"
+			placeholder="Type to search"
+			class="w-full placeholder:text-sm py-[6px]  pl-8 placeholder:text-gray-400 border-[1.5px] border-gray-300 shadow-[0_0_4px_0_rgba(0,0,0,0.1)] rounded-xl  focus:border-gray-400 hover:shadow-[0_0_4px_0_rgba(0,0,0,0.2)] focus:outline-none"
+			hx-post="/search"
+			hx-trigger="input changed delay:500ms, search"
+			hx-target="#repos"
+		/>
+	</div>
+}

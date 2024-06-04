@@ -1,0 +1,22 @@
+package pages
+
+import "github.com/NotAJocke/stars-viewer/internal/templates/shared"
+import "github.com/NotAJocke/stars-viewer/internal/github"
+import "github.com/NotAJocke/stars-viewer/internal/templates/components"
+
+templ HomePage(repos []github.StarredRepo) {
+	@shared.Page("Home") {
+		@components.TwUtility()
+		<div class="w-full flex justify-center mt-12 mb-6">
+			<div class="2xl:w-[84%] xl:w-[78%] lg:w-[68%] w-[80%]">
+				<div class="flex justify-between">
+					@components.SearchBar()
+					@components.UpdateBtn()
+				</div>
+			</div>
+		</div>
+		<div class="flex gap-6 flex-wrap justify-center" id="repos">
+			@components.LazyStarredRepos(repos, len(repos))
+		</div>
+	}
+}
