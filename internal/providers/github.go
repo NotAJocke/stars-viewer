@@ -37,12 +37,12 @@ func UpdateCache(db *sql.DB) ([]github.StarredRepo, error) {
 	return reposToAdd, nil
 }
 
-func SearchRepos(db *sql.DB, query string, limit int) {
-	database.SearchRepos(db, query, limit)
+func SearchRepos(db *sql.DB, query string, limit int) []github.StarredRepo {
+	return database.SearchRepos(db, query, limit)
 }
 
-func GetStarredRepos(db *sql.DB, limit int) []github.StarredRepo {
-	return database.GetRepos(db, limit)
+func GetStarredRepos(db *sql.DB, limit int, offset int) []github.StarredRepo {
+	return database.GetRepos(db, limit, offset)
 }
 
 func UnstarRepo(db *sql.DB, fullName string) {

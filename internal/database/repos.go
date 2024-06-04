@@ -59,26 +59,14 @@ func GetLastStarred(db *sql.DB) github.StarredRepo {
 	return repo
 }
 
-func GetRepos(db *sql.DB, limit int) []github.StarredRepo {
+func GetRepos(db *sql.DB, limit int, offset int) []github.StarredRepo {
 	var q string
 
-	if limit != 0 {
-		q = `SELECT 
+	q = `SELECT 
     name, description, full_name, url, starred_at, topics, language 
-    FROM stars ORDER BY starred_at DESC LIMIT ?;`
-	} else {
-		q = `SELECT 
-    name, description, full_name, url, starred_at, topics, language 
-    FROM stars ORDER BY starred_at DESC;`
-	}
+    FROM stars ORDER BY starred_at DESC LIMIT ? OFFSET ?;`
 
-	var rows *sql.Rows
-	var err error
-	if limit != 0 {
-		rows, err = db.Query(q, limit)
-	} else {
-		rows, err = db.Query(q)
-	}
+	rows, err := db.Query(q, limit, offset)
 
 	if err != nil {
 		log.Fatalln(err)
